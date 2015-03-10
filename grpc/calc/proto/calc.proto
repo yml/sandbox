@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package proto;
+
+service calc {
+    rpc Add(Request) returns (Response) {}
+    //rpc Substract(Request) returns (Response) {}
+}
+
+message Request {
+    float x = 1;
+    float y = 2;
+}
+
+message Response {
+    float z = 1;
+}
