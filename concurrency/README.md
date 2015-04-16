@@ -1,13 +1,13 @@
 # concurrency in Python vs GO
 
-I have been lucky enough to attend Pycon in Montreal in the past few days among all the talks I attended one has blown my mind away: [Python concurrency from the Ground Up: LIVE!](http://us.pycon.org/2015/schedule/presentation/374/) by David Beazley. The video is available on [youtube](https://www.youtube.com/watch?v=MCs5OvhV9S4)
+I have been lucky enough to attend Pycon in Montreal in the past few days among all the talks I attended one has blown my mind away and got me thinking: [Python concurrency from the Ground Up: LIVE!](http://us.pycon.org/2015/schedule/presentation/374/) by David Beazley. The video is available on [youtube](https://www.youtube.com/watch?v=MCs5OvhV9S4)
 
 The gist of the talk is that going from synchronous program in python to a concurrent program requires a significant amount of leg work. The talk take a simple socket program that calculate **fibonacci** sum synchronously and makes it concurrents. The talk compare and contrast various approach: Threads, Multi processes, corountines.
 
 My take away was that there is multiple way of doing it in python but none of them are great at taking advantage of multi cores.
-When I went through the process of typing the code used in his demo I decided for the fun of it to port to GO to compare and contrast.
+When I went through the process of typing the code used in his demo I decided for the fun of it to port it to GO to compare and contrast.
 
-The first surprises for me was how similar the synchronous version looks like in both language.
+The first surprises for me was how similar the synchronous version is in both languages.
 
 ```
 # synchronous.py
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     fib_server(('', 25000))
 ```
 
-The GO version requires a bit more typing and type ceremonies.
+The GO version requires a bit more typing and type ceremonies but the structure is very similar.
 
 ```
 package main
@@ -116,14 +116,18 @@ func main() {
 }
 ```
 
-The beauty of the GO version is that it only takes 2 letters to move from the synchronous to a concurrent version `GO`.
+The beauty of the GO version is that it only takes 2 letters to move from the synchronous to a concurrent version `go` in front of the function call to `fibHandler(conn)`
+.
 
-The python equivalent is way harder to pull off.
+The python equivalent is way harder to pull off I think it is probably out of reach for a huge portion of experimented python developer.
 
 ```
 from socket import *
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor as Pool
 from select import select
+
+pool = Pool(4)
 
 def fib(n):
     if n <= 2:
@@ -149,7 +153,9 @@ def fib_handler(conn):
         if not req:
             break
         n = int(req)
-        result = fib(n)
+        future = pool.submit(fib, n)
+        yield 'future', future 
+        result = future.result()  # blocking
         resp = str(result).encode('ascii') + b'\n'
         yield 'send', conn
         conn.send(resp)  # blocking
@@ -158,6 +164,20 @@ def fib_handler(conn):
 tasks = deque()
 recv_wait = {}
 send_wait = {}
+future_wait = {}
+
+future_notify, future_event = socketpair()
+
+def future_done(future):
+    tasks.append(future_wait.pop(future))
+    future_notify.send(b'x')
+
+def future_monitor():
+    while True:
+        yield 'recv', future_event
+        future_event.recv(100)
+
+tasks.append(future_monitor())
 
 def run():
     while any([tasks, recv_wait, send_wait]):
@@ -175,6 +195,9 @@ def run():
                 recv_wait[what] = task
             elif why == 'send':
                 send_wait[what] = task
+            elif why == 'future':
+                future_wait[what] = task
+                what.add_done_callback(future_done)
             else:
                 raise RuntimeError("We don't know what to do with :", why)
         except StopIteration:
@@ -185,4 +208,15 @@ if __name__ == "__main__":
     run()
 ```
 
-The interesting part is that even with all this works the python version can't take advantage of all the cores. Where the GO equivalent is controlled by an env variable called `GOMAXPROCS` that determined how many cores you want to allocate to your programs.
+The interesting part is that even with all this work the python version can't take advantage of all the cores. Where the GO equivalent is controlled by an env variable called `GOMAXPROCS` that determined how many cores you want to allocate to your programs. The performance characteristic is also different by an order of magnitude:
+
+**fib 30**
+
+* python: 231ms
+* go: 8ms
+
+**req/s** with 3 clients running perf2.py
+
+* python: 277 req/s
+* go: ~10000 req/s
+
