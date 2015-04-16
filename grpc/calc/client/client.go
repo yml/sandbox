@@ -27,5 +27,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to add with err : %v", err)
 	}
-	fmt.Printf("Result of the addition %v/n", resp.Z)
+	fmt.Printf("Result of the addition %v\n", resp.Z)
+	fmt.Println("key in")
+	var input string
+	_, err = fmt.Scanf("%s", &input)
+	if err != nil {
+		log.Fatalf("Failed to scan the input, err : %v", err)
+	}
+	fmt.Printf("input: %s\n", input)
 }
