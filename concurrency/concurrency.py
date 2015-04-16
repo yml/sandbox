@@ -1,6 +1,9 @@
 from socket import *
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor as Pool
 from select import select
+
+pool = Pool(4)
 
 def fib(n):
     if n <= 2:
@@ -26,7 +29,9 @@ def fib_handler(conn):
         if not req:
             break
         n = int(req)
-        result = fib(n)
+        future = pool.submit(fib, n)
+        yield 'future', future 
+        result = future.result()  # blocking
         resp = str(result).encode('ascii') + b'\n'
         yield 'send', conn
         conn.send(resp)  # blocking
@@ -35,6 +40,20 @@ def fib_handler(conn):
 tasks = deque()
 recv_wait = {}
 send_wait = {}
+future_wait = {}
+
+future_notify, future_event = socketpair()
+
+def future_done(future):
+    tasks.append(future_wait.pop(future))
+    future_notify.send(b'x')
+
+def future_monitor():
+    while True:
+        yield 'recv', future_event
+        future_event.recv(100)
+
+tasks.append(future_monitor())
 
 def run():
     while any([tasks, recv_wait, send_wait]):
@@ -52,6 +71,9 @@ def run():
                 recv_wait[what] = task
             elif why == 'send':
                 send_wait[what] = task
+            elif why == 'future':
+                future_wait[what] = task
+                what.add_done_callback(future_done)
             else:
                 raise RuntimeError("We don't know what to do with :", why)
         except StopIteration:
