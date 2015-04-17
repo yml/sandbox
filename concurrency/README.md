@@ -1,13 +1,14 @@
 # concurrency in Python vs GO
 
-I have been lucky enough to attend Pycon in Montreal in the past few days among all the talks I attended one has blown my mind away and got me thinking: [Python concurrency from the Ground Up: LIVE!](http://us.pycon.org/2015/schedule/presentation/374/) by David Beazley. The video is available on [youtube](https://www.youtube.com/watch?v=MCs5OvhV9S4)
+Last week I have had the chance to attend Pycon in Montreal in the past few days. Among all the talks I attended one has blown my mind away and got me thinking: [Python concurrency from the Ground Up: LIVE!](http://us.pycon.org/2015/schedule/presentation/374/) by David Beazley. The video is available on [youtube](https://www.youtube.com/watch?v=MCs5OvhV9S4)
 
-The gist of the talk is that going from synchronous program in python to a concurrent program requires a significant amount of leg work. The talk take a simple socket program that calculate **fibonacci** sum synchronously and makes it concurrents. The talk compare and contrast various approach: Threads, Multi processes, corountines.
+The gist of the talk is that going from synchronous to a concurrent program in python requires a significant amount of leg work.
+The talk took a simple socket program that calculate **fibonacci** sum synchronously and makes it concurrent. It compares and contrasts various approach: Threads, Multi processes, corountines.
 
-My take away was that there is multiple way of doing it in python but none of them are great at taking advantage of multi cores.
+My take away was that there are a zillion ways of doing it in python but none of them are great at taking advantage of multi cores.
 When I went through the process of typing the code used in his demo I decided for the fun of it to port it to GO to compare and contrast.
 
-The first surprises for me was how similar the synchronous version is in both languages.
+The first surprises for me was how similar the synchronous version is in both languages. The code and the micro benchmarks that follow should be taken with a grain or salt like always.
 
 ```
 # synchronous.py
@@ -47,6 +48,7 @@ if __name__ == "__main__":
 The GO version requires a bit more typing and type ceremonies but the structure is very similar.
 
 ```
+// synchronous.go
 package main
 
 import (
@@ -78,7 +80,7 @@ func fibServer(addr string) {
 			log.Println(err)
 			continue
 		}
-		fibHandler(conn)
+		fibHandler(conn)  // prefix by `go` to get concurrent.go
 	}
 }
 
@@ -116,10 +118,10 @@ func main() {
 }
 ```
 
-The beauty of the GO version is that it only takes 2 letters to move from the synchronous to a concurrent version `go` in front of the function call to `fibHandler(conn)`
-.
+The beauty of GO is that it only takes 2 letters to move from the synchronous to a concurrent version `go` in front of the function call to `fibHandler(conn)`. In addition of this simplicity there is one obvious way to do it.
 
-The python equivalent is way harder to pull off I think it is probably out of reach for a huge portion of experimented python developer.
+The python equivalent is way harder to pull off, one could argue that it is probably out of reach for a huge portion of experimented python developer. David Beazley illustrates very well the phenomenal diversity of approaches that could be taken, all broken to some extend. I am sure some other candidates comes to your mind: asyncio, twisted, tornado, ... 
+Below you can see how the couroutines version would look like.
 
 ```
 from socket import *
@@ -213,10 +215,11 @@ The interesting part is that even with all this work the python version can't ta
 **fib 30**
 
 * python: 231ms
-* go: 8ms
+* go: 5ms
 
 **req/s** with 3 clients running perf2.py
 
-* python: 277 req/s
-* go: ~10000 req/s
+* python: 277 req/s per `perf2.py` instances -- concurrency.py takes 188MB of RAM
+* go (GOMAXPROCS=3): ~10581 req/s  per `perf2.py` instances -- concurrency.go takes 120MB of RAM
 
+GO is faster than python this is fine and expected. What I find more disturbing is that it is easier to morph a synchronous program into its concurrent equivalent. The resulting piece of GO code is also more readable and easier to reason about.
