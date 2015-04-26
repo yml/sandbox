@@ -42,13 +42,13 @@ func fibHandler(conn net.Conn) {
 			conn.Close()
 			break
 		}
-		reqStr := string(bytes.Trim(buf[0:n], "\n"))
-		req, err = strconv.Atoi(reqStr)
+		req, err = strconv.Atoi(string(bytes.Trim(buf[0:n], "\n")))
 		if err != nil {
-			log.Println("The request must be a number", reqStr, err)
+			log.Println("The request must be a number", err)
+			continue
 		}
-		result := fmt.Sprintf("%v\n", fib(int64(req)))
-		_, err = conn.Write([]byte(result))
+		resp := strconv.FormatInt(fib(int64(req)), 10)
+		_, err = conn.Write([]byte(resp + "\n"))
 		if err != nil {
 			fmt.Println("Error while writing to the socket")
 		}
@@ -60,7 +60,7 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) != 1 {
-		fmt.Println("You must provide an addr (127.0.0.1:25000)")
+		fmt.Println("You must provide an addr (ie: 127.0.0.1:25000 )")
 		return
 	}
 	fibServer(args[0])
