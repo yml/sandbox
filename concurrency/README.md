@@ -1,14 +1,12 @@
 # concurrency in Python vs GO
 
-At Pycon in Montreal few weeks ago I  attended a talk that has blown my mind away and got me thinking: [Python concurrency from the Ground Up: LIVE!](http://us.pycon.org/2015/schedule/presentation/374/) by David Beazley. The video is available on [youtube](https://www.youtube.com/watch?v=MCs5OvhV9S4)
+At Pycon in Montreal few weeks ago I  attended a talk that blew my mind away and got me thinking: [Python concurrency from the Ground Up: LIVE!](http://us.pycon.org/2015/schedule/presentation/374/) by David Beazley. The video is available on [YouTube](https://www.youtube.com/watch?v=MCs5OvhV9S4).
 
-The gist of the talk is that going from synchronous to a concurrent program in python requires a significant amount of leg work.
-The talk took a simple socket program that calculate **fibonacci** sum synchronously and tries to make it concurrent. It compares and contrasts various approach: Threads, Multi processes, corountines.
+The gist of the talk is that going from a synchronous to a concurrent program in Python requires a significant amount of leg work. The talk took a simple socket program that calculates the **Fibonacci** sum synchronously and tries to make it concurrent. It compares and contrasts various approachs: threads, multiple processes, and corountines.
 
-My take away was that there are a zillion ways of doing it in python but none of them are great at taking advantage of multi cores.
-When I went through the process of typing the code used in his demo I decided for the fun of it to port it to GO.
+My take away was that there are a zillion ways of doing it in Python but none of them are great at taking advantage of multi cores. When I went through the process of typing the code used in his demo I decided for the fun of it to port it to Go.
 
-The first surprises for me was how similar the synchronous version is in both languages. The code and the micro benchmarks that follow should be taken with a grain or salt like always.
+The first surprises for me was how similar the synchronous version is in both languages. The code and the micro benchmarks that follow should be taken with a grain of salt like always.
 
 
 ## Synchronous
@@ -49,7 +47,7 @@ if __name__ == "__main__":
     fib_server(('', 25000))
 ```
 
-The GO version requires a bit more typing and type ceremonies but the structure is very similar.
+The Go version requires a bit more typing and type ceremonies but the structure is very similar.
 
 ```
 @syntax:go
@@ -123,9 +121,9 @@ func main() {
 }
 ```
 
-### synchronous micro benchmark 
+### Synchronous Micro-Benchmark 
 
-The benchmark consist of running one instance of `perf2.py` which simulate a client hammering on our micro service.
+The benchmark consists of running one instance of `perf2.py` which simulates a client hammering on our micro service.
 
 ```
 @syntax:python
@@ -156,25 +154,17 @@ while True:
     n += 1
 ```
 
-**python**
+* **Python** ~17,000 req/s 
+* **PyPy**  ~22,000 req/s
+* **Go**  ~21,000 req/s
 
-* ~17 000 req/s 
+PyPy is faster than go by a small margin but as far as I am concerned I would say that the 3 solutions are within the same order of magnitude.
 
-**pypy**
+## Concurrency
 
-* ~22 000 req/s
+The beauty of Go is that it only takes 2 letters to move from a synchronous to a concurrent version. Simply add `go` in front of the function call to `fibHandler(conn)`. Not only is it simple, but, unlike Python, there is one obvious way to do it.
 
-**GO**
-
-* ~21 000 req/s
-
-pypy is faster than go by a small margin but as far as I am concerned I would say that the 3 solutions are within the same order of magnitude.
-
-## concurrency
-
-The beauty of GO is that it only takes 2 letters to move from the synchronous to a concurrent version `go` in front of the function call to `fibHandler(conn)`. In addition of this simplicity there is one obvious way to do it.
-
-The python equivalent is way harder to pull off, one could argue that it is probably out of reach for a huge portion of experimented python developer. David Beazley illustrates very well the phenomenal diversity of approaches that could be taken, all broken to some extend. I am sure some other candidates comes to your mind: asyncio, twisted, tornado, ... 
+The Python equivalent is way harder to pull off, one could argue that it is probably out of reach for a huge portion of experienced Python developers. David Beazley illustrates very well the phenomenal diversity of approaches that could be taken, all broken to some extent. I am sure some other candidates comes to your mind: asyncio, Twisted, Tornado, etc.
 
 Below you can see the coroutines version with a zest of ProcessPoolExecutor.
 
@@ -266,20 +256,25 @@ if __name__ == "__main__":
     run()
 ```
 
-The interesting part is that even with all this work the python version can't take advantage of all the cores. Where the GO equivalent is controlled by an environment variable called `GOMAXPROCS` that determined how many cores you want to allocate to your programs. The performance characteristic is also different by an order of magnitude:
+The interesting part is that even with all this work the Python version can't take advantage of all the cores. Where the Go equivalent is controlled by an environment variable called `GOMAXPROCS` that determines how many cores you want to allocate to your programs. The performance characteristics are also different by an order of magnitude:
 
-### Concurrent micro benchmark
+### Concurrent Micro-Benchmark
 
-This micro benchmark does not include `pypy` because some of the features used in `concurrency.py` are not supported (No module named concurrent).
+This micro-benchmark does not include `PyPy` because some of the features used in `concurrency.py` are not currently supported, specifically the `concurrent` module.
 
-**fib 30**
+#### `fib(30)`
 
-* python: 231ms
-* go: 5ms
+A single iteration with 30 as the argument to `fib`.
 
-**req/s** with 3 clients running `perf2.py`
+* **Python** 231ms
+* **Go** 5ms
 
-* python: 275 req/s per `perf2.py` instances -- concurrency.py takes 188MB of RAM
-* go (GOMAXPROCS=3): 12500 req/s  per `perf2.py` instances -- concurrency.go takes 120MB of RAM
+#### Requests per second
 
-GO is faster than python this is fine and expected. What I find more disturbing is how much easier it is to morph a synchronous program into its concurrent equivalent. In addition the resulting piece of GO code is also more readable and easier to reason about. Not all the problems require a concurrent solution but for the one that does GO has a lot to offer.
+3 clients running `perf2.py`
+
+* **Python** 275 req/s per `perf2.py` instance -- `concurrency.py` takes 188MB of RAM
+* **Go** (`GOMAXPROCS=3`): 12500 req/s  per `perf2.py` instance -- `concurrency.go` takes 120MB of RAM
+
+Go is significantly faster than Python; this is fine and expected. What I find more disturbing is how much easier it is to morph a synchronous program into its concurrent equivalent. In addition the resulting piece of Go code is also more readable and easier to reason about. Not all problems require a concurrent solution but for the ones that do Go has a lot to offer.
+
